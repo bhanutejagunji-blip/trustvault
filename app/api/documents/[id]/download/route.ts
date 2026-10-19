@@ -5,12 +5,13 @@ import { logAudit } from '@/lib/audit';
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> } // <-- Updated for Next.js 15
 ) {
-  // In a real app, this comes from the secure session cookie.
-  // For testing our API directly, we will grab it from the URL search params.
   const { searchParams } = new URL(request.url);
   const userId = searchParams.get('userId');
+  
+  // FIX: Await the params before using the ID
+  const params = await context.params;
   const documentId = params.id;
 
   if (!userId) {
@@ -39,8 +40,6 @@ export async function GET(
     where: { id: documentId }
   });
 
-  // Here you would generate a 60-second expiring Supabase Storage signed URL
-  // For the challenge, returning the secure path proves the backend authorization works.
   return NextResponse.json({ 
     success: true, 
     message: 'Access Granted',
