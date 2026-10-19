@@ -1,0 +1,74 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  OWNER
+  VIEWER
+}
+
+enum AccessLevel {
+  READ
+  EDIT
+}
+
+enum AuditStatus {
+  SUCCESS
+  DENIED
+}
+
+model User {
+  id                String       @id @default(uuid())
+  email             String       @unique
+  role              Role
+  passwordHash      String
+  ownedDocs         Document[]   @relation("DocumentOwner")
+  permissions       Permission[]
+  grantedPerms      Permission[] @relation("GrantedBy")
+  auditActions      AuditLog[]   @relation("Actor")
+  createdAt         DateTime     @default(now())
+}
+
+model Document {
+  id                String       @id @default(uuid())
+  ownerId           String
+  owner             User         @relation("DocumentOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  name              String
+  category          String?
+  storagePath       String
+  permissions       Permission[]
+  createdAt         DateTime     @default(now())
+}
+
+model Permission {
+  id                String       @id @default(uuid())
+  documentId        String
+  document          Document     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessLevel       AccessLevel
+  grantedById       String?
+  grantedBy         User?        @relation("GrantedBy", fields: [grantedById], references: [id])
+  grantedAt         DateTime     @default(now())
+
+  @@unique([documentId, userId])
+}
+
+model AuditLog {
+  id                String       @id @default(uuid())
+  actorId           String?
+  actor             User?        @relation("Actor", fields: [actorId], references: [id])
+  action            String
+  resourceId        String?
+  status            AuditStatus
+  details           Json?
+  previousHash      String?
+  currentHash       String
+  createdAt         DateTime     @default(now())
+}
