@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TrustVault - Secure Document Sharing
 
-## Getting Started
+**Live Demo:** trustvault-ezwm-aedcf7zj5-apex-76a2.vercel.app
 
-First, run the development server:
+TrustVault is a secure document-sharing platform where the server decides access on every single request, and every action is recorded in a tamper-evident cryptographic audit log.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Test Credentials (Judges)
+- **Admin:** `admin@trustvault.com` / `password123`
+- **Owner:** `owner@trustvault.com` / `password123`
+- **Viewer:** `viewer@trustvault.com` / `password123`
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## The Permission Model & Design Decisions
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 1. What I Built and the Permission Model
+I implemented a strict **Per-Document Grant** model. 
+Permissions are not stored in JWTs or session cookies. Instead, the system does a live database lookup against the `Permission` table on every single request. 
+- **Owner:** The user who uploads a file is granted `EDIT` access.
+- **Viewer:** Owners can grant `READ` access to specific emails. 
+- **Revocation:** "Taking access away immediately" means deleting the row from the `Permission` table. Because there is no caching and no reliance on token expiration, the very next millisecond, any download request fails instantly.
 
-## Learn More
+### 2. The Cryptographic Audit Trail
+To ensure the audit log cannot be quietly altered by an administrator, I implemented a **Cryptographic Hash Chain**. Every action (Upload, Download Attempt, Permission Change) generates a SHA-256 hash combining its payload and the hash of the *previous* log entry. If a row is manually modified in the database, the chain breaks, proving tampering.
 
-To learn more about Next.js, take a look at the following resources:
+### 3. What I Deliberately Left Out
+- I skipped folder inheritance and groups to keep the permission model mathematically simple and bulletproof for a 7-day timeline. A small system with a perfect permission model beats a large one with holes.
+- I skipped AWS S3 integration for the demo, instead verifying the security logic by returning signed-URL string paths upon successful authorization.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 4. How I Used AI
+I used an AI pair programmer heavily to generate the Next.js boilerplate, Prisma schema, and UI components. 
+**Where it went wrong:** The AI confidently hallucinated several times regarding dependency versions (e.g., trying to use deprecated Prisma 8 RC commands, and missing Next.js 15 async route param updates). I caught these errors, forced version downgrades, and re-wrote the middleware logic. *See `PROMPTS.md` for a full breakdown of catching the AI's mistakes.*
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## API Documentation
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Endpoint | Method | Allowed Roles | Description |
+|---|---|---|---|
+| `/api/auth/login` | POST | Public | Authenticates users. |
+| `/api/documents/upload` | POST | Any logged-in user | Uploads a document and grants the uploader `EDIT` permissions. |
+| `/api/documents` | GET | Any logged-in user | Returns a list of documents the user has explicitly been granted access to. |
+| `/api/documents/[id]/download` | GET | `READ` or `EDIT` | The core security gate. Checks the DB live. Blocks instantly with 403 if no permission row exists. |
+| `/api/documents/[id]/permissions` | POST | `EDIT` only | Grants or revokes access for a target user. |
+| `/api/audit` | GET | `ADMIN` only | Returns the tamper-evident cryptographic hash chain of all system events. |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## Deployment & Setup Instructions
+To run this locally from a clean clone:
+
+1. **Install dependencies:**
+   ```bash
+   npm install
