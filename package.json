@@ -2,14 +2,13 @@
   "name": "trustvault",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "prisma generate && next build",
-    "start": "next start",
-    "lint": "eslint",
-    "postinstall": "prisma generate",
-    "db:push": "prisma db push"
-  },
+"scripts": {
+  "dev": "next dev",
+  "build": "prisma generate && next build",
+  "start": "next start",
+  "lint": "eslint",
+  "db:push": "prisma db push"
+},
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "crypto-js": "^4.2.0",
